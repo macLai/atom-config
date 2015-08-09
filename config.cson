@@ -1,0 +1,50 @@
+"*":
+  "exception-reporting":
+    userId: "f8a7c39c-f970-03f0-95c0-d995653809ec"
+  welcome:
+    showOnStartup: false
+  minimap:
+    scrollAnimation: true
+  core:
+    themes: [
+      "atom-material-ui"
+      "atom-material-syntax"
+    ]
+    ignoredNames: [
+      ".*"
+    ]
+    disabledPackages: [
+      "vim-mode"
+      "markdown-preview-plus"
+    ]
+  "markdown-preview":
+    useGitHubStyle: true
+    breakOnSingleNewline: true
+  editor:
+    invisibles: {}
+  "atom-material-ui":
+    compactTreeView: true
+    showTabIcons: true
+    slimScrollbar: true
+    tabSize: "Small"
+    rippleAccentColor: true
+    panelContrast: true
+  "tree-view":
+    hideIgnoredNames: true
+  "find-and-replace":
+    openProjectFindResultsInRightPane: true
+    scrollToResultOnLiveSearch: true
+  "fuzzy-finder":
+    preserveLastSearch: true
+    ignoredNames: [
+      ".*"
+    ]
+  "status-bar": {}
+  "vim-mode": {}
+  "autohide-tree-view":
+    showOn: "click"
+  "autocomplete-python": {}
+  "atom-beautify": {}
+  jsformat: {}
+  "markdown-preview-plus": {}
+  "todo-show": {}
