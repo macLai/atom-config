@@ -13,10 +13,6 @@
     ignoredNames: [
       ".*"
     ]
-    disabledPackages: [
-      "vim-mode"
-      "markdown-preview-plus"
-    ]
   "markdown-preview":
     useGitHubStyle: true
     breakOnSingleNewline: true
@@ -44,7 +40,11 @@
   "autohide-tree-view":
     showOn: "click"
   "autocomplete-python": {}
-  "atom-beautify": {}
-  jsformat: {}
+  "atom-beautify":
+    _analyticsUserId: "7e196b1b-a488-484e-a559-1b8fc1e130f5"
+  jsformat:
+    format_on_save: false
   "markdown-preview-plus": {}
   "todo-show": {}
+  "linter-tidy": {}
+  linter: {}

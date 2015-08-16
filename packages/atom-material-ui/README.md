@@ -9,13 +9,9 @@ Inspired by Mattia Astorino's [SublimeText theme](https://github.com/equinusocio
 
 Fire up a console and type:
 
-`$ apm install atom-material-ui atom-material-syntax`
+`$ apm install atom-material-ui atom-material-syntax atom-material-syntax-light`
 
 Or, inside Atom's settings select Install and then search for this package.
-
-## Buy me some coffee
-
-<a href='https://pledgie.com/campaigns/29552'><img alt='Click here to lend your support to: Atom Material Design Theme and make a donation at pledgie.com !' src='https://pledgie.com/campaigns/29552.png?skin_name=chrome' border='0' ></a>
 
 ## Configuration
 
@@ -34,6 +30,10 @@ Here's the obligatory screenshot. The toolbar on the left side is a package name
 Animated tabs! (these animations can be disabled from the theme's settings)
 
 ![](http://i.imgur.com/lUR3uRv.gif)
+
+## Light syntax theme variant
+
+![](http://i.imgur.com/HkCKXxX.png)
 
 ## Extra
 

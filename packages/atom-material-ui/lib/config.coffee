@@ -2,6 +2,21 @@ module.exports =
     apply: ->
         root = document.documentElement
 
+        # Check if there are custom icons packages
+
+        checkPacks = () ->
+            root.classList.remove('dont-change-icons')
+
+            loadedPackages =  atom.packages.getActivePackages()
+            iconPacks = ['file-icons', 'file-type-icons', 'seti-icons', 'envygeeks-file-icons']
+
+            loadedPackages.forEach (pack, i) ->
+                if (iconPacks.indexOf(pack.name) >= 0)
+                    root.classList.add('dont-change-icons')
+
+        atom.packages.onDidActivatePackage () -> checkPacks()
+        atom.packages.onDidDeactivatePackage () -> checkPacks()
+
         # Accent color
 
         setAccentColor = (currentAccentColor) ->
@@ -155,11 +170,13 @@ module.exports =
 
         # Tab Icons
 
-        setShowTabIcons = (boolean) ->
-            if boolean
-                root.classList.add('tab-icons')
-            else
-                root.classList.remove('tab-icons')
+        setShowTabIcons = (option) ->
+          root.classList.remove('tab-icons')
+          root.classList.remove('tab-icons-all')
+          if option == 'Show on active tab'
+              root.classList.add('tab-icons')
+          else if option == 'Show on all tabs'
+              root.classList.add('tab-icons-all')
 
         atom.config.onDidChange 'atom-material-ui.showTabIcons', ->
             setShowTabIcons(atom.config.get('atom-material-ui.showTabIcons'))

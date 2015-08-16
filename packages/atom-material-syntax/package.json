@@ -1,7 +1,7 @@
 {
   "name": "atom-material-syntax",
   "theme": "syntax",
-  "version": "0.2.1",
+  "version": "0.2.3",
   "description": "A dark syntax theme for Atom that uses Google's Material Design color palette",
   "keywords": [
     "syntax",
@@ -23,10 +23,10 @@
     "url": "https://github.com/silvestreh/atom-material-syntax/issues"
   },
   "homepage": "https://github.com/silvestreh/atom-material-syntax",
-  "_id": "atom-material-syntax@0.2.1",
-  "_shasum": "b4ee3d22f51895f0e7e7510fc70180e1d890d34c",
-  "_resolved": "file:../d-11574-41938-6xr6fr/package.tgz",
-  "_from": "../d-11574-41938-6xr6fr/package.tgz",
+  "_id": "atom-material-syntax@0.2.3",
+  "_shasum": "e2aee04174baa2a6af4ccbe528c780990f46710d",
+  "_resolved": "file:../d-115714-6221-dxfhxq/package.tgz",
+  "_from": "../d-115714-6221-dxfhxq/package.tgz",
   "_atomModuleCache": {
     "version": 1,
     "dependencies": [],

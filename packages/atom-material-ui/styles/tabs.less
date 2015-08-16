@@ -18,7 +18,7 @@
     padding: 0;
     overflow-x: auto;
     overflow-y: hidden;
-    .panel-background(@app-background-color);
+    background-color: @app-background-color;
 
     &::-webkit-scrollbar {
         display: none;
@@ -253,6 +253,21 @@
             }
         }
     }
+}
+.tab-icons-all {
+  .tab-bar {
+      .tab { // Specificity increase to prevent putting !important on transform
+          .title {
+              padding-left: 24px;
+          }
+          .title::before {
+              display: block !important;
+              width: auto;
+              height: auto;
+              transform: translateY(-50%) scale(1) !important;
+          }
+      }
+  }
 }
 .tab-size-small .tab-bar {
     .tab-size(32px);
