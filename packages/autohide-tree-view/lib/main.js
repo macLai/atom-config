@@ -4,15 +4,10 @@ import SubAtom from 'sub-atom';
 import {
   enable as enableAutohide,
   disable as disableAutohide,
+  toggleEnabled as toggleAutohide,
 } from './autohide-tree-view.js';
 
-import {
-  destroy as destroyPinView,
-  initialize as initializePinView,
-  activate as pin,
-  deactivate as unpin,
-  toggle as togglePinned,
-} from './pin-view.js';
+import pinView from './pin-view.js';
 
 import {
   getConfig,
@@ -22,57 +17,66 @@ import {
 
 export config from './config.js';
 
+export * from './service-provider.js';
+
+export {
+  consumeTouchEvents,
+} from './touch-events.js';
+
 var disposables;
 
 export function activate() {
+  if(!atom.packages.isPackageLoaded('tree-view'))
+    return atom.notifications.addError('autohide-tree-view: Could not activate because the tree-view package doesn\'t seem to be loaded');
+
   migrateConfig();
 
-  disposables = new SubAtom();
+  atom.packages.activatePackage('tree-view').then(() => {
+    disposables = new SubAtom();
 
-  disposables.add(atom.commands.add('atom-workspace', {
-    ['autohide-tree-view:pin']() {
-      pin();
-    },
-    ['autohide-tree-view:unpin']() {
-      unpin();
-    },
-    ['autohide-tree-view:toggle-pinned']() {
-      togglePinned();
-    },
-    ['autohide-tree-view:toggle-push-editor']() {
-      toggleConfig('pushEditor');
-    },
-  }));
+    disposables.add(atom.commands.add('atom-workspace', {
+      ['autohide-tree-view:pin']() {
+        disableAutohide();
+      },
+      ['autohide-tree-view:unpin']() {
+        enableAutohide();
+      },
+      ['autohide-tree-view:toggle-pinned']() {
+        toggleAutohide();
+      },
+      ['autohide-tree-view:toggle-push-editor']() {
+        toggleConfig('pushEditor');
+      },
+    }));
 
-  disposables.add(atom.config.observe('autohide-tree-view.maxWindowWidth', maxWindowWidth =>
-    onWindowResize(maxWindowWidth)
-  ));
+    disposables.add(atom.config.observe('autohide-tree-view.maxWindowWidth', maxWindowWidth =>
+      onWindowResize(maxWindowWidth)
+    ));
 
-  disposables.add(window, 'resize', () =>
-    onWindowResize()
-  );
+    disposables.add(window, 'resize', () =>
+      onWindowResize()
+    );
 
-  initializePinView();
+    pinView.attach();
+  });
 }
 
 export function deactivate() {
   disableAutohide();
-  destroyPinView();
+  pinView.detach();
   disposables.dispose();
   disposables = null;
 }
 
 function onWindowResize(maxWindowWidth = getConfig('maxWindowWidth')) {
-  maxWindowWidth == 0 || window.innerWidth < maxWindowWidth ? enableAutohide() : disableAutohide();
+  // ignore when the tree view is pinned
+  if(pinView.parentNode && pinView.isActive) return;
+
+  if(maxWindowWidth == 0 || window.innerWidth < maxWindowWidth) {
+    enableAutohide();
+    pinView.attach();
+  } else {
+    disableAutohide();
+    pinView.detach();
+  }
 }
-
-export {
-  provideService,
-  provideServiceV2,
-  provideServiceV3,
-} from './service-provider.js';
-
-export {
-  consumeTouchSwipeLeftService,
-  consumeTouchSwipeRightService,
-} from './touch-events.js';

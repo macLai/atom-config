@@ -5,6 +5,8 @@ wrench = require 'wrench'
 MarkdownPreviewView = require '../lib/markdown-preview-view'
 {$} = require 'atom-space-pen-views'
 
+require './spec-helper'
+
 describe "Markdown preview plus package", ->
   [workspaceElement, preview] = []
 
@@ -24,6 +26,11 @@ describe "Markdown preview plus package", ->
 
     waitsForPromise ->
       atom.packages.activatePackage('language-gfm')
+
+  afterEach ->
+    if preview instanceof MarkdownPreviewView
+      preview.destroy()
+    preview = null
 
   expectPreviewInSplitPane = ->
     runs ->
@@ -59,12 +66,14 @@ describe "Markdown preview plus package", ->
         runs -> atom.commands.dispatch workspaceElement, 'markdown-preview-plus:toggle'
         expectPreviewInSplitPane()
 
+    # https://github.com/atom/markdown-preview/issues/28
     describe "when the path contains a space", ->
       it "renders the preview", ->
         waitsForPromise -> atom.workspace.open("subdir/file with space.md")
         runs -> atom.commands.dispatch workspaceElement, 'markdown-preview-plus:toggle'
         expectPreviewInSplitPane()
 
+    # https://github.com/atom/markdown-preview/issues/29
     describe "when the path contains accented characters", ->
       it "renders the preview", ->
         waitsForPromise -> atom.workspace.open("subdir/áccéntéd.md")
@@ -77,12 +86,43 @@ describe "Markdown preview plus package", ->
       runs -> atom.commands.dispatch workspaceElement, 'markdown-preview-plus:toggle'
       expectPreviewInSplitPane()
 
-    it "closes the existing preview when toggle is triggered a second time on the editor", ->
+    it "closes the existing preview when toggle is triggered a second time on the editor and when the preview is its panes active item", ->
       atom.commands.dispatch workspaceElement, 'markdown-preview-plus:toggle'
 
       [editorPane, previewPane] = atom.workspace.getPanes()
       expect(editorPane.isActive()).toBe true
       expect(previewPane.getActiveItem()).toBeUndefined()
+
+    it "activates the existing preview when toggle is triggered a second time on the editor and when the preview is not its panes active item #nottravis", ->
+      [editorPane, previewPane] = atom.workspace.getPanes()
+
+      editorPane.activate()
+      waitsForPromise -> atom.workspace.open("subdir/simple.md")
+      runs -> atom.commands.dispatch workspaceElement, 'markdown-preview-plus:toggle'
+
+      waitsFor "second markdown preview to be created", ->
+        previewPane.getItems().length is 2
+
+      runs ->
+        preview = previewPane.getActiveItem()
+        expect(preview).toBeInstanceOf(MarkdownPreviewView)
+        expect(previewPane.getActiveItemIndex()).toBe(1)
+        expect(preview.getPath()).toBe editorPane.getActiveItem().getPath()
+        expect(preview.getPath()).toBe atom.workspace.getActivePaneItem().getPath()
+
+        editorPane.activate()
+        editorPane.activateItemAtIndex(0)
+
+        atom.commands.dispatch workspaceElement, 'markdown-preview-plus:toggle'
+
+      waitsFor "first preview to be activated", ->
+        previewPane.getActiveItemIndex() is 0
+
+      runs ->
+        preview = previewPane.getActiveItem()
+        expect(previewPane.getItems().length).toBe(2)
+        expect(preview.getPath()).toBe editorPane.getActiveItem().getPath()
+        expect(preview.getPath()).toBe atom.workspace.getActivePaneItem().getPath()
 
     it "closes the existing preview when toggle is triggered on it and it has focus", ->
       [editorPane, previewPane] = atom.workspace.getPanes()
@@ -235,13 +275,15 @@ describe "Markdown preview plus package", ->
       runs ->
         expect(preview.getTitle()).toBe 'file.markdown Preview'
         preview.onDidChangeTitle(titleChangedCallback)
-        fs.renameSync(atom.workspace.getActiveTextEditor().getPath(), path.join(path.dirname(atom.workspace.getActiveTextEditor().getPath()), 'file2.md'))
+        filePath = atom.workspace.getActiveTextEditor().getPath()
+        fs.renameSync(filePath, path.join(path.dirname(filePath), 'file2.md'))
 
       waitsFor ->
         preview.getTitle() is "file2.md Preview"
 
       runs ->
         expect(titleChangedCallback).toHaveBeenCalled()
+        preview.destroy()
 
   describe "when the URI opened does not have a markdown-preview-plus protocol", ->
     it "does not throw an error trying to decode the URI (regression)", ->
@@ -316,8 +358,9 @@ describe "Markdown preview plus package", ->
       runs ->
         expect($(preview[0]).find("div.update-preview").html()).toBe """
           <p>hello</p>
-          <p></p>
-          <p>
+
+
+          <p>sad
           <img>
           world</p>
         """

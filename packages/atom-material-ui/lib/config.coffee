@@ -50,6 +50,19 @@ module.exports =
 
         setRobotoFont(atom.config.get('atom-material-ui.useRoboto'))
 
+        # Roboto font for UI
+
+        setRobotoUIFont = (boolean) ->
+            if boolean
+                root.classList.add('roboto')
+            else
+                root.classList.remove('roboto')
+
+        atom.config.onDidChange 'atom-material-ui.useRobotoInUI', ->
+            setRobotoUIFont(atom.config.get('atom-material-ui.useRobotoInUI'))
+
+        setRobotoUIFont(atom.config.get('atom-material-ui.useRobotoInUI'))
+
         # Slim Scrollbars
 
         setSlimScrollbars = (boolean) ->
@@ -127,19 +140,6 @@ module.exports =
             setTabSize(atom.config.get('atom-material-ui.tabSize'))
 
         setTabSize(atom.config.get('atom-material-ui.tabSize'))
-
-        # Theme Style
-
-        setThemeStyle = (currentThemeStyle) ->
-            root.classList.remove('theme-style-darker')
-            root.classList.remove('theme-style-default')
-            root.classList.remove('theme-style-lighter')
-            root.classList.add('theme-style-' + currentThemeStyle.toLowerCase())
-
-        atom.config.onDidChange 'atom-material-ui.themeSyle', ->
-            setThemeStyle(atom.config.get('atom-material-ui.themeSyle'))
-
-        setThemeStyle(atom.config.get('atom-material-ui.themeSyle'))
 
         # Tree-view Size
 

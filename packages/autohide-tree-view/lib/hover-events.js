@@ -1,10 +1,4 @@
 'use babel';
-import 'object-assign-shim';
-
-import {
-  Disposable,
-} from 'atom';
-
 import SubAtom from 'sub-atom';
 
 import {
@@ -45,21 +39,19 @@ export function enable() {
   ));
 
   disposables.add(hoverArea, 'mouseenter', () =>
-    showTreeView(getConfig('showDelay'), false)
+    showTreeView(getConfig('showDelay'), false, getConfig('autoFocusTreeViewOnHover'))
   );
 
   disposables.add(getTreeViewEl(), 'mouseleave', () =>
-    hideTreeView(getConfig('hideDelay'))
+    hideTreeView(getConfig('hideDelay'), getConfig('autoFocusTreeViewOnHover'))
   );
 
   disposables.add(getTreeViewEl().querySelector('.tree-view-resize-handle'), 'mousedown', event => {
-    if(event.which != 0) return;
-    disableDuringMouseDown();
+    if(event.button == 0) disableDuringMouseDown();
   });
 
   disposables.add('atom-workspace', 'mousedown', 'atom-text-editor', event => {
-    if(event.which != 0) return;
-    disableDuringMouseDown();
+    if(event.button == 0) disableDuringMouseDown();
   });
 }
 
@@ -81,9 +73,6 @@ function updateSize(hoverWidth = getConfig('hoverAreaSize')) {
   var minWidth = getConfig('minWidth');
   hoverWidth = Math.max(1, hoverWidth, minWidth);
   hoverArea.style.minWidth = `${hoverWidth}px`;
-  Object.assign(hoverArea.style, {
-    minWidth: `${hoverWidth}px`,
-  });
 }
 
 export function disableDuringMouseDown() {
@@ -95,20 +84,17 @@ export function disableDuringMouseDown() {
 }
 
 export function disableUntilBlur() {
+  if(!enabled) return;
   disable();
 
-  function onBlur() {
-    disposable.dispose();
+  var disposable = new SubAtom();
+
+  disposable.add(getTreeView().list, 'blur', function onBlur() {
     clearFocusedElement();
     enable();
     hideTreeView();
-  }
-
-  getTreeView().list[0].addEventListener('blur', onBlur);
-
-  var disposable = new Disposable(() => {
-    getTreeView().list[0].removeEventListener('blur', onBlur);
-    [ onBlur, disposable ] = [];
+    this.removeEventListener('blur', onBlur);
+    disposable.dispose();
   });
 
   return disposable;

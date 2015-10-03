@@ -45,6 +45,12 @@ module.exports =
       type: 'boolean'
       default: false
       order: 40
+    useLazyHeaders:
+      title: 'Use Lazy Headers'
+      description: 'Require no space after headings #'
+      type: 'boolean'
+      default: true
+      order: 45
     useGitHubStyle:
       title: 'Use GitHub.com style'
       type: 'boolean'
@@ -180,7 +186,11 @@ module.exports =
     uri = @uriForEditor(editor)
     previewPane = atom.workspace.paneForURI(uri)
     if previewPane?
-      previewPane.destroyItem(previewPane.itemForURI(uri))
+      preview = previewPane.itemForURI(uri)
+      if preview isnt previewPane.getActiveItem()
+        previewPane.activateItem(preview)
+        return false
+      previewPane.destroyItem(preview)
       true
     else
       false
@@ -212,7 +222,7 @@ module.exports =
 
     renderer ?= require './renderer'
     text = editor.getSelectedText() or editor.getText()
-    renderer.toHTML text, editor.getPath(), editor.getGrammar(), false, (error, html) ->
+    renderer.toHTML text, editor.getPath(), editor.getGrammar(), false, true, (error, html) ->
       if error
         console.warn('Copying Markdown as HTML failed', error)
       else

@@ -12,7 +12,14 @@ class MessageRegistry {
     this.subscriptions = new CompositeDisposable()
     this.emitter = new Emitter()
     this.linterResponses = new Map()
-    this.editorMessages = new Map()
+    // We track messages by the underlying TextBuffer the lint was run against
+    // rather than the TextEditor because there may be multiple TextEditors per
+    // TextBuffer when multiple panes are in use.  For each buffer, we store a
+    // map whose values are messages and whose keys are the linter that produced
+    // the messages.  (Note that we are talking about linter instances, not
+    // EditorLinter instances.  EditorLinter instances are per-TextEditor and
+    // could result in duplicated sets of messages.)
+    this.bufferMessages = new Map()
 
     this.subscriptions.add(this.emitter)
     this.subscriptions.add(atom.config.observe('linter.ignoredMessageTypes', value => this.ignoredMessageTypes = (value || [])))
@@ -37,37 +44,44 @@ class MessageRegistry {
     if (linter.scope === 'file') {
       if (!editor.alive) return
       if (!(editor instanceof TextEditor)) throw new Error("Given editor isn't really an editor")
-      if (!this.editorMessages.has(editor))
-        this.editorMessages.set(editor, new Map())
-      this.editorMessages.get(editor).set(linter, messages)
+      let buffer = editor.getBuffer()
+      if (!this.bufferMessages.has(buffer))
+        this.bufferMessages.set(buffer, new Map())
+      this.bufferMessages.get(buffer).set(linter, messages)
     } else { // It's project
       this.linterResponses.set(linter, messages)
     }
     this.hasChanged = true
   }
   updatePublic() {
+    let latestMessages = []
     let publicMessages = []
     let added = []
     let removed = []
     let currentKeys
     let lastKeys
 
-    this.linterResponses.forEach(messages => publicMessages = publicMessages.concat(messages))
-    this.editorMessages.forEach(editorMessages =>
-      editorMessages.forEach(messages => publicMessages = publicMessages.concat(messages))
+    this.linterResponses.forEach(messages => latestMessages = latestMessages.concat(messages))
+    this.bufferMessages.forEach(bufferMessages =>
+      bufferMessages.forEach(messages => latestMessages = latestMessages.concat(messages))
     )
 
-    currentKeys = publicMessages.map(i => i.key)
+    currentKeys = latestMessages.map(i => i.key)
     lastKeys = this.publicMessages.map(i => i.key)
 
-    publicMessages.forEach(function(i) {
-      if (lastKeys.indexOf(i.key) === -1)
+    for (let i of latestMessages) {
+      if (lastKeys.indexOf(i.key) === -1) {
         added.push(i)
-    })
-    this.publicMessages.forEach(function(i) {
+        publicMessages.push(i)
+      }
+    }
+
+    for (let i of this.publicMessages)
       if (currentKeys.indexOf(i.key) === -1)
         removed.push(i)
-    })
+      else
+        publicMessages.push(i)
+
     this.publicMessages = publicMessages
     this.emitter.emit('did-update-messages', {added, removed, messages: publicMessages})
   }
@@ -76,7 +90,7 @@ class MessageRegistry {
   }
   deleteMessages(linter) {
     if (linter.scope === 'file') {
-      this.editorMessages.forEach(r => r.delete(linter))
+      this.bufferMessages.forEach(r => r.delete(linter))
       this.hasChanged = true
     } else if(this.linterResponses.has(linter)) {
       this.linterResponses.delete(linter)
@@ -84,15 +98,22 @@ class MessageRegistry {
     }
   }
   deleteEditorMessages(editor) {
-    if (!this.editorMessages.has(editor)) return
-    this.editorMessages.delete(editor)
+    // Caveat: in the event that there are multiple TextEditor instances open
+    // referring to the same underlying buffer and those instances are not also
+    // closed, the linting results for this buffer will be temporarily removed
+    // until such time as a lint is re-triggered by one of the other
+    // corresponding EditorLinter instances.  There are ways to mitigate this,
+    // but they all involve some complexity that does not yet seem justified.
+    let buffer = editor.getBuffer();
+    if (!this.bufferMessages.has(buffer)) return
+    this.bufferMessages.delete(buffer)
     this.hasChanged = true
   }
-  deactivate() {
+  dispose() {
     this.shouldRefresh = false
     this.subscriptions.dispose()
     this.linterResponses.clear()
-    this.editorMessages.clear()
+    this.bufferMessages.clear()
   }
 }
 

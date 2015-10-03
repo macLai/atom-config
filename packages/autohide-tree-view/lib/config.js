@@ -2,9 +2,9 @@
 
 const config = {
   showOn: {
-    description: 'The type of event that triggers the tree view to show or hide. The touch events require atom-touch-events (https://atom.io/packages/atom-touch-events) to be installed. You\'ll need to restart this package after installing atom-touch-events for touch events to become available.',
+    description: 'The type of event that triggers the tree view to show or hide. The touch events require atom-touch-events (https://atom.io/packages/atom-touch-events) to be installed. You\'ll need to restart Atom after installing atom-touch-events for touch events to become available.',
     type: 'string',
-    default: 'hover + touch',
+    default: 'hover',
     enum: [
       'hover',
       'click',
@@ -39,7 +39,7 @@ const config = {
     order: 3,
   },
   maxWidth: {
-    description: 'The max width of the tree view when it is expanded in pixels. Set to 0 to always extend to the max filename width.',
+    description: 'The max width in pixels of the tree view when it is expanded. Set to 0 to always extend to the max filename width.',
     type: 'integer',
     default: 0,
     minimum: 0,

@@ -23,18 +23,19 @@ describe "Operators", ->
     editor.normalModeInputView.editorElement.getModel().setText(key)
 
   describe "cancelling operations", ->
-    it "does not throw an error even if no operation is pending", ->
+    it "throws an error when no operation is pending", ->
       # cancel operation pushes an empty input operation
-      # doing this without a pending operation throws an exception
+      # doing this without a pending operation would throw an exception
       expect(-> vimState.pushOperations(new Input(''))).toThrow()
 
+    it "cancels and cleans up properly", ->
       # make sure normalModeInputView is created
       keydown('/')
       expect(vimState.isOperatorPending()).toBe true
       editor.normalModeInputView.viewModel.cancel()
 
       expect(vimState.isOperatorPending()).toBe false
-      expect(-> editor.normalModeInputView.viewModel.cancel()).not.toThrow()
+      expect(editor.normalModeInputView).toBe undefined
 
   describe "the x keybinding", ->
     describe "on a line with content", ->
@@ -100,7 +101,6 @@ describe "Operators", ->
           keydown('u')
           expect(editor.getText()).toBe "abc\n012345\n\nxyz"
 
-
       describe "with vim-mode.wrapLeftRightMotion", ->
         beforeEach ->
           editor.setText("abc\n012345\n\nxyz")
@@ -160,7 +160,6 @@ describe "Operators", ->
           expect(editor.getCursorScreenPosition()).toEqual [0, 1]
           expect(vimState.getRegister('"').text).toBe '0123\n\nx'
 
-
     describe "on an empty line", ->
       beforeEach ->
         editor.setText("abc\n012345\n\nxyz")
@@ -177,7 +176,6 @@ describe "Operators", ->
         keydown('x')
         expect(editor.getText()).toBe "abc\n012345\nxyz"
         expect(editor.getCursorScreenPosition()).toEqual [2, 0]
-
 
   describe "the X keybinding", ->
     describe "on a line with content", ->
@@ -206,7 +204,6 @@ describe "Operators", ->
         expect(editor.getText()).toBe 'ab2345'
         expect(editor.getCursorScreenPosition()).toEqual [0, 2]
         expect(vimState.getRegister('"').text).toBe '\n'
-
 
     describe "on an empty line", ->
       beforeEach ->
@@ -709,6 +706,88 @@ describe "Operators", ->
           keydown('escape')
           expect(editor.getText()).toBe("12345\n\n")
 
+    describe "when followed by a %", ->
+      beforeEach ->
+        editor.setText("12345(67)8\nabc(d)e\nA()BCDE")
+
+      describe "before brackets or on the first one", ->
+        beforeEach ->
+          editor.setCursorScreenPosition([0, 1])
+          editor.addCursorAtScreenPosition([1, 1])
+          editor.addCursorAtScreenPosition([2, 1])
+          keydown('c')
+          keydown('%')
+          editor.insertText('x')
+
+        it "replaces inclusively until matching bracket", ->
+          expect(editor.getText()).toBe("1x8\naxe\nAxBCDE")
+          expect(vimState.mode).toBe "insert"
+
+        it "undoes correctly with u", ->
+          keydown('escape')
+          expect(vimState.mode).toBe "normal"
+          keydown 'u'
+          expect(editor.getText()).toBe("12345(67)8\nabc(d)e\nA()BCDE")
+
+      describe "inside brackets or on the ending one", ->
+        it "replaces inclusively backwards until matching bracket", ->
+          editor.setCursorScreenPosition([0, 6])
+          editor.addCursorAtScreenPosition([1, 5])
+          editor.addCursorAtScreenPosition([2, 2])
+          keydown('c')
+          keydown('%')
+          editor.insertText('x')
+          expect(editor.getText()).toBe("12345x7)8\nabcxe\nAxBCDE")
+          expect(vimState.mode).toBe "insert"
+
+      describe "after or without brackets", ->
+        it "deletes nothing", ->
+          editor.setText("12345(67)8\nabc(d)e\nABCDE")
+          editor.setCursorScreenPosition([0, 9])
+          editor.addCursorAtScreenPosition([2, 2])
+          keydown('c')
+          keydown('%')
+          expect(editor.getText()).toBe("12345(67)8\nabc(d)e\nABCDE")
+          expect(vimState.mode).toBe "normal"
+
+      describe "repetition with .", ->
+        beforeEach ->
+          editor.setCursorScreenPosition([0, 1])
+          keydown('c')
+          keydown('%')
+          editor.insertText('x')
+          keydown('escape')
+
+        it "repeats correctly before a bracket", ->
+          editor.setCursorScreenPosition([1, 0])
+          keydown('.')
+          expect(editor.getText()).toBe("1x8\nxe\nA()BCDE")
+          expect(vimState.mode).toBe "normal"
+
+        it "repeats correctly on the opening bracket", ->
+          editor.setCursorScreenPosition([1, 3])
+          keydown('.')
+          expect(editor.getText()).toBe("1x8\nabcxe\nA()BCDE")
+          expect(vimState.mode).toBe "normal"
+
+        it "repeats correctly inside brackets", ->
+          editor.setCursorScreenPosition([1, 4])
+          keydown('.')
+          expect(editor.getText()).toBe("1x8\nabcx)e\nA()BCDE")
+          expect(vimState.mode).toBe "normal"
+
+        it "repeats correctly on the closing bracket", ->
+          editor.setCursorScreenPosition([1, 5])
+          keydown('.')
+          expect(editor.getText()).toBe("1x8\nabcxe\nA()BCDE")
+          expect(vimState.mode).toBe "normal"
+
+        it "does nothing when repeated after a bracket", ->
+          editor.setCursorScreenPosition([2, 3])
+          keydown('.')
+          expect(editor.getText()).toBe("1x8\nabc(d)e\nA()BCDE")
+          expect(vimState.mode).toBe "normal"
+
     describe "when followed by a goto line G", ->
       beforeEach ->
         editor.setText "12345\nabcde\nABCDE"
@@ -869,8 +948,9 @@ describe "Operators", ->
 
   describe "the y keybinding", ->
     beforeEach ->
-      editor.getBuffer().setText("012 345\nabc\n")
+      editor.getBuffer().setText("012 345\nabc\ndefg\n")
       editor.setCursorScreenPosition([0, 4])
+      vimState.setRegister('"', text: '345')
 
     describe "when selected lines in visual linewise mode", ->
       beforeEach ->
@@ -981,6 +1061,18 @@ describe "Operators", ->
       it "leaves the cursor at the starting position", ->
         expect(editor.getCursorScreenPosition()).toEqual [0, 4]
 
+    describe "with an up motion", ->
+      beforeEach ->
+        editor.setCursorScreenPosition([2, 2])
+        keydown 'y'
+        keydown 'k'
+
+      it "saves both full lines to the default register", ->
+        expect(vimState.getRegister('"').text).toBe "abc\ndefg\n"
+
+      it "puts the cursor on the first line and the original column", ->
+        expect(editor.getCursorScreenPosition()).toEqual [1, 2]
+
     describe "when followed by a G", ->
       beforeEach ->
         originalText = "12345\nabcde\nABCDE"
@@ -1036,6 +1128,47 @@ describe "Operators", ->
 
         expect(vimState.getRegister('"').text).toBe '123'
         expect(editor.getCursorBufferPositions()).toEqual [[0, 0], [1, 2]]
+
+    describe "in a long file", ->
+      beforeEach ->
+        editor.setHeight(400)
+        editor.setLineHeightInPixels(10)
+        editor.setDefaultCharWidth(10)
+        text = ""
+        for i in [1..200]
+          text += "#{i}\n"
+        editor.setText(text)
+
+      describe "yanking many lines forward", ->
+        it "does not scroll the window", ->
+          editor.setCursorBufferPosition [40, 1]
+          previousScrollTop = editor.getScrollTop()
+
+          # yank many lines
+          keydown('y')
+          keydown('1')
+          keydown('6')
+          keydown('0')
+          keydown('G', shift: true)
+
+          expect(editor.getScrollTop()).toEqual(previousScrollTop)
+          expect(editor.getCursorBufferPosition()).toEqual [40, 1]
+          expect(vimState.getRegister('"').text.split('\n').length).toBe 121
+
+      describe "yanking many lines backwards", ->
+        it "scrolls the window", ->
+          editor.setCursorBufferPosition [140, 1]
+          previousScrollTop = editor.getScrollTop()
+
+          # yank many lines
+          keydown('y')
+          keydown('6')
+          keydown('0')
+          keydown('G', shift: true)
+
+          expect(editor.getScrollTop()).toNotEqual previousScrollTop
+          expect(editor.getCursorBufferPosition()).toEqual [59, 1]
+          expect(vimState.getRegister('"').text.split('\n').length).toBe 83
 
   describe "the yy keybinding", ->
     describe "on a single line file", ->
@@ -1480,6 +1613,18 @@ describe "Operators", ->
           expect(editor.getText()).toBe "    12345\n    abcde\nABCDE"
           expect(editor.getSelectedBufferRanges()).toEqual [ [[0, 4], [0, 4]] ]
 
+    describe "with multiple selections", ->
+      beforeEach ->
+        editor.setCursorScreenPosition([1, 3])
+        keydown('v')
+        keydown('j')
+        editor.addCursorAtScreenPosition([0, 0])
+
+      it "indents the lines and keeps the cursors", ->
+        keydown('>')
+        expect(editor.getText()).toBe "  12345\n  abcde\n  ABCDE"
+        expect(editor.getCursorScreenPositions()).toEqual [[1, 2], [0, 2]]
+
   describe "the < keybinding", ->
     beforeEach ->
       editor.setText("    12345\n    abcde\nABCDE")
@@ -1564,6 +1709,16 @@ describe "Operators", ->
 
         it "indents the current line", ->
           expect(editor.indentationForBufferRow(1)).toBe 0
+
+      describe "when followed by a G", ->
+        beforeEach ->
+          editor.setCursorScreenPosition([0, 0])
+          keydown('=')
+          keydown('G', shift: true)
+
+        it "uses the default count", ->
+          expect(editor.indentationForBufferRow(1)).toBe 0
+          expect(editor.indentationForBufferRow(2)).toBe 0
 
       describe "when followed by a repeating =", ->
         beforeEach ->
@@ -1659,6 +1814,34 @@ describe "Operators", ->
         normalModeInputKeydown('x')
         expect(editor.getCursorBufferPositions()).toEqual [[0, 0], [1, 0]]
 
+    describe 'with accented characters', ->
+      buildIMECompositionEvent = (event, {data, target}={}) ->
+        event = new Event(event)
+        event.data = data
+        Object.defineProperty(event, 'target', get: -> target)
+        event
+
+      buildTextInputEvent = ({data, target}) ->
+        event = new Event('textInput')
+        event.data = data
+        Object.defineProperty(event, 'target', get: -> target)
+        event
+
+      it 'works with IME composition', ->
+        keydown('r')
+        normalModeEditor = editor.normalModeInputView.editorElement
+        jasmine.attachToDOM(normalModeEditor)
+        domNode = normalModeEditor.component.domNode
+        inputNode = domNode.querySelector('.hidden-input')
+        domNode.dispatchEvent(buildIMECompositionEvent('compositionstart', target: inputNode))
+        domNode.dispatchEvent(buildIMECompositionEvent('compositionupdate', data: 's', target: inputNode))
+        expect(normalModeEditor.getModel().getText()).toEqual 's'
+        domNode.dispatchEvent(buildIMECompositionEvent('compositionupdate', data: 'sd', target: inputNode))
+        expect(normalModeEditor.getModel().getText()).toEqual 'sd'
+        domNode.dispatchEvent(buildIMECompositionEvent('compositionend', target: inputNode))
+        domNode.dispatchEvent(buildTextInputEvent(data: '速度', target: inputNode))
+        expect(editor.getText()).toBe '速度2\n速度4\n\n'
+
   describe 'the m keybinding', ->
     beforeEach ->
       editor.setText('12\n34\n56\n')
@@ -1711,6 +1894,13 @@ describe "Operators", ->
         keydown("l")
         expect(editor.getText()).toBe 'Abc\nXyZ'
 
+      it "uses default count", ->
+        editor.setCursorBufferPosition([0, 0])
+        keydown("g")
+        keydown("~")
+        keydown("G", shift: true)
+        expect(editor.getText()).toBe 'AbC\nxYz'
+
   describe 'the U keybinding', ->
     beforeEach ->
       editor.setText('aBc\nXyZ')
@@ -1734,6 +1924,13 @@ describe "Operators", ->
       expect(editor.getText()).toBe 'ABC\nXYZ'
       expect(editor.getCursorScreenPosition()).toEqual [1, 2]
 
+    it "uses default count", ->
+      editor.setCursorBufferPosition([0, 0])
+      keydown("g")
+      keydown("U", shift: true)
+      keydown("G", shift: true)
+      expect(editor.getText()).toBe 'ABC\nXYZ'
+
     it "makes the selected text uppercase in visual mode", ->
       keydown("V", shift: true)
       keydown("U", shift: true)
@@ -1750,6 +1947,13 @@ describe "Operators", ->
       keydown("$")
       expect(editor.getText()).toBe 'abc\nXyZ'
       expect(editor.getCursorScreenPosition()).toEqual [0, 2]
+
+    it "uses default count", ->
+      editor.setCursorBufferPosition([0, 0])
+      keydown("g")
+      keydown("u")
+      keydown("G", shift: true)
+      expect(editor.getText()).toBe 'abc\nxyz'
 
     it "makes the selected text lowercase in visual mode", ->
       keydown("V", shift: true)
@@ -1871,18 +2075,21 @@ describe "Operators", ->
         keydown('a', ctrl: true)
         expect(editor.getCursorBufferPositions()).toEqual [[0, 2], [1, 3], [2, 4], [3, 3], [4, 0]]
         expect(editor.getText()).toBe '124\nab46\ncd-66ef\nab-4\na-bcdef'
+        expect(atom.beep).not.toHaveBeenCalled()
 
       it "repeats with .", ->
         keydown 'a', ctrl: true
         keydown '.'
         expect(editor.getCursorBufferPositions()).toEqual [[0, 2], [1, 3], [2, 4], [3, 3], [4, 0]]
         expect(editor.getText()).toBe '125\nab47\ncd-65ef\nab-3\na-bcdef'
+        expect(atom.beep).not.toHaveBeenCalled()
 
       it "can have a count", ->
         keydown '5'
         keydown 'a', ctrl: true
         expect(editor.getCursorBufferPositions()).toEqual [[0, 2], [1, 3], [2, 4], [3, 2], [4, 0]]
         expect(editor.getText()).toBe '128\nab50\ncd-62ef\nab0\na-bcdef'
+        expect(atom.beep).not.toHaveBeenCalled()
 
       it "can make a negative number positive, change number of digits", ->
         keydown '9'
@@ -1890,12 +2097,14 @@ describe "Operators", ->
         keydown 'a', ctrl: true
         expect(editor.getCursorBufferPositions()).toEqual [[0, 2], [1, 4], [2, 3], [3, 3], [4, 0]]
         expect(editor.getText()).toBe '222\nab144\ncd32ef\nab94\na-bcdef'
+        expect(atom.beep).not.toHaveBeenCalled()
 
       it "does nothing when cursor is after the number", ->
         editor.setCursorBufferPosition [2, 5]
         keydown 'a', ctrl: true
         expect(editor.getCursorBufferPositions()).toEqual [[2, 5]]
         expect(editor.getText()).toBe '123\nab45\ncd-67ef\nab-5\na-bcdef'
+        expect(atom.beep).toHaveBeenCalled()
 
       it "does nothing on an empty line", ->
         editor.setText('\n')
@@ -1904,6 +2113,7 @@ describe "Operators", ->
         keydown 'a', ctrl: true
         expect(editor.getCursorBufferPositions()).toEqual [[0, 0], [1, 0]]
         expect(editor.getText()).toBe '\n'
+        expect(atom.beep).toHaveBeenCalled()
 
       it "honours the vim-mode:numberRegex setting", ->
         editor.setText('123\nab45\ncd -67ef\nab-5\na-bcdef')
@@ -1916,24 +2126,28 @@ describe "Operators", ->
         keydown('a', ctrl: true)
         expect(editor.getCursorBufferPositions()).toEqual [[0, 2], [1, 3], [2, 5], [3, 3], [4, 0]]
         expect(editor.getText()).toBe '124\nab46\ncd -66ef\nab-6\na-bcdef'
+        expect(atom.beep).not.toHaveBeenCalled()
 
     describe "decreasing numbers", ->
       it "decreases the next number", ->
         keydown('x', ctrl: true)
         expect(editor.getCursorBufferPositions()).toEqual [[0, 2], [1, 3], [2, 4], [3, 3], [4, 0]]
         expect(editor.getText()).toBe '122\nab44\ncd-68ef\nab-6\na-bcdef'
+        expect(atom.beep).not.toHaveBeenCalled()
 
       it "repeats with .", ->
         keydown 'x', ctrl: true
         keydown '.'
         expect(editor.getCursorBufferPositions()).toEqual [[0, 2], [1, 3], [2, 4], [3, 3], [4, 0]]
         expect(editor.getText()).toBe '121\nab43\ncd-69ef\nab-7\na-bcdef'
+        expect(atom.beep).not.toHaveBeenCalled()
 
       it "can have a count", ->
         keydown '5'
         keydown 'x', ctrl: true
         expect(editor.getCursorBufferPositions()).toEqual [[0, 2], [1, 3], [2, 4], [3, 4], [4, 0]]
         expect(editor.getText()).toBe '118\nab40\ncd-72ef\nab-10\na-bcdef'
+        expect(atom.beep).not.toHaveBeenCalled()
 
       it "can make a positive number negative, change number of digits", ->
         keydown '9'
@@ -1941,12 +2155,14 @@ describe "Operators", ->
         keydown 'x', ctrl: true
         expect(editor.getCursorBufferPositions()).toEqual [[0, 1], [1, 4], [2, 5], [3, 5], [4, 0]]
         expect(editor.getText()).toBe '24\nab-54\ncd-166ef\nab-104\na-bcdef'
+        expect(atom.beep).not.toHaveBeenCalled()
 
       it "does nothing when cursor is after the number", ->
         editor.setCursorBufferPosition [2, 5]
         keydown 'x', ctrl: true
         expect(editor.getCursorBufferPositions()).toEqual [[2, 5]]
         expect(editor.getText()).toBe '123\nab45\ncd-67ef\nab-5\na-bcdef'
+        expect(atom.beep).toHaveBeenCalled()
 
       it "does nothing on an empty line", ->
         editor.setText('\n')
@@ -1955,6 +2171,7 @@ describe "Operators", ->
         keydown 'x', ctrl: true
         expect(editor.getCursorBufferPositions()).toEqual [[0, 0], [1, 0]]
         expect(editor.getText()).toBe '\n'
+        expect(atom.beep).toHaveBeenCalled()
 
       it "honours the vim-mode:numberRegex setting", ->
         editor.setText('123\nab45\ncd -67ef\nab-5\na-bcdef')
@@ -1967,6 +2184,7 @@ describe "Operators", ->
         keydown('x', ctrl: true)
         expect(editor.getCursorBufferPositions()).toEqual [[0, 2], [1, 3], [2, 5], [3, 3], [4, 0]]
         expect(editor.getText()).toBe '122\nab44\ncd -68ef\nab-4\na-bcdef'
+        expect(atom.beep).not.toHaveBeenCalled()
 
   describe 'the R keybinding', ->
     beforeEach ->

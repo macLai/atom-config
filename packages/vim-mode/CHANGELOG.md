@@ -1,5 +1,17 @@
 ## HEAD
 
+## 0.60
+
+* Fixed an issue where commands that took one character of input didn't
+  work with characters composed via IME - @jacekkopecky
+* Fixed an issue where the '%' motion would select the wrong range
+  when moving backwards - @jacekkopecky
+
+## 0.59
+
+* Fixed an issue where normal Atom commands and mouse drags couldn't
+  move the cursor to the end of a line - @jacekkopecky
+
 ## 0.58
 
 * Fixed repetition of commands executed in visual mode - @jacekkopecky

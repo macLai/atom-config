@@ -2,12 +2,14 @@ path = require 'path'
 fs = require 'fs-plus'
 temp = require 'temp'
 MarkdownPreviewView = require '../lib/markdown-preview-view'
-pathWatcher = require 'pathwatcher'
+markdownIt = require '../lib/markdown-it-helper'
 url = require 'url'
 queryString = require 'querystring'
 
+require './spec-helper'
+
 describe "MarkdownPreviewView", ->
-  [file, preview, workspaceElement] = []
+  [filePath, preview] = []
 
   beforeEach ->
     filePath = atom.project.getDirectories()[0].resolve('subdir/file.markdown')
@@ -29,6 +31,17 @@ describe "MarkdownPreviewView", ->
 
   afterEach ->
     preview.destroy()
+
+  expectPreviewInSplitPane = ->
+    runs ->
+      expect(atom.workspace.getPanes()).toHaveLength 2
+
+    waitsFor "markdown preview to be created", ->
+      preview = atom.workspace.getPanes()[1].getActiveItem()
+
+    runs ->
+      expect(preview).toBeInstanceOf(MarkdownPreviewView)
+      expect(preview.getPath()).toBe atom.workspace.getActivePaneItem().getPath()
 
   describe "::constructor", ->
     # Loading spinner disabled when DOM update by diff was introduced. If
@@ -76,6 +89,31 @@ describe "MarkdownPreviewView", ->
         jasmine.attachToDOM(newPreview.element)
         expect(newPreview.getPath()).toBe preview.getPath()
 
+  describe "header rendering", ->
+
+    it "should render headings with and without space", ->
+
+      waitsForPromise -> preview.renderMarkdown()
+
+      runs ->
+        headlines = preview.find('h2')
+        expect(headlines).toExist()
+        expect(headlines.length).toBe(2)
+        expect(headlines[0].outerHTML).toBe("<h2>Level two header without space</h2>")
+        expect(headlines[1].outerHTML).toBe("<h2>Level two header with space</h2>")
+
+    it "should render headings with and without space", ->
+      atom.config.set 'markdown-preview-plus.useLazyHeaders', false
+
+      waitsForPromise -> preview.renderMarkdown()
+
+      runs ->
+        headlines = preview.find('h2')
+        expect(headlines).toExist()
+        expect(headlines.length).toBe(1)
+        expect(headlines[0].outerHTML).toBe("<h2>Level two header with space</h2>")
+
+
   describe "code block conversion to atom-text-editor tags", ->
     beforeEach ->
       waitsForPromise ->
@@ -101,7 +139,7 @@ describe "MarkdownPreviewView", ->
         expect(jsEditor).toExist()
         expect(jsEditor[0].getModel().getText()).toBe """
           if a === 3 {
-          b = 5
+            b = 5
           }
         """
 
@@ -117,18 +155,21 @@ describe "MarkdownPreviewView", ->
 
   describe "image resolving", ->
     beforeEach ->
+      spyOn(markdownIt, 'decode').andCallThrough()
       waitsForPromise ->
         preview.renderMarkdown()
 
     describe "when the image uses a relative path", ->
       it "resolves to a path relative to the file", ->
         image = preview.find("img[alt=Image1]")
-        expect(image.attr('src')).toBe atom.project.getDirectories()[0].resolve('subdir/image1.png')
+        expect(markdownIt.decode).toHaveBeenCalled()
+        expect(image.attr('src')).toStartWith atom.project.getDirectories()[0].resolve('subdir/image1.png')
 
     describe "when the image uses an absolute path that does not exist", ->
       it "resolves to a path relative to the project root", ->
         image = preview.find("img[alt=Image2]")
-        expect(image.attr('src')).toBe atom.project.getDirectories()[0].resolve('tmp/image2.png')
+        expect(markdownIt.decode).toHaveBeenCalled()
+        expect(image.attr('src')).toStartWith atom.project.getDirectories()[0].resolve('tmp/image2.png')
 
     describe "when the image uses an absolute path that exists", ->
       it "adds a query to the URL", ->
@@ -143,15 +184,17 @@ describe "MarkdownPreviewView", ->
           preview.renderMarkdown()
 
         runs ->
+          expect(markdownIt.decode).toHaveBeenCalled()
           expect(preview.find("img[alt=absolute]").attr('src')).toStartWith "#{filePath}?v="
 
     describe "when the image uses a web URL", ->
       it "doesn't change the URL", ->
         image = preview.find("img[alt=Image3]")
-        expect(image.attr('src')).toBe 'http://github.com/image3.png'
+        expect(markdownIt.decode).toHaveBeenCalled()
+        expect(image.attr('src')).toBe 'https://raw.githubusercontent.com/Galadirith/markdown-preview-plus/master/assets/hr.png'
 
   describe "image modification", ->
-    [dirPath, filePath, img1Path] = []
+    [dirPath, filePath, img1Path, workspaceElement] = []
 
     beforeEach ->
       preview.destroy()
@@ -171,17 +214,6 @@ describe "MarkdownPreviewView", ->
       waitsForPromise ->
         atom.packages.activatePackage("markdown-preview-plus")
 
-    expectPreviewInSplitPane = ->
-      runs ->
-        expect(atom.workspace.getPanes()).toHaveLength 2
-
-      waitsFor "markdown preview to be created", ->
-        preview = atom.workspace.getPanes()[1].getActiveItem()
-
-      runs ->
-        expect(preview).toBeInstanceOf(MarkdownPreviewView)
-        expect(preview.getPath()).toBe atom.workspace.getActivePaneItem().getPath()
-
     getImageVersion = (imagePath, imageURL) ->
       expect(imageURL).toStartWith "#{imagePath}?v="
       urlQueryStr = url.parse(imageURL).query
@@ -199,7 +231,7 @@ describe "MarkdownPreviewView", ->
           imageVer = getImageVersion(img1Path, imageURL)
           expect(imageVer).not.toEqual('deleted')
 
-    describe "when a local image is modified during a preview", ->
+    describe "when a local image is modified during a preview #notwercker", ->
       it "rerenders the image with a more recent timestamp query", ->
         [imageURL, imageVer] = []
 
@@ -223,7 +255,7 @@ describe "MarkdownPreviewView", ->
           expect(newImageVer).not.toEqual('deleted')
           expect(parseInt(newImageVer)).toBeGreaterThan(parseInt(imageVer))
 
-    describe "when three images are previewed and all are modified", ->
+    describe "when three images are previewed and all are modified #notwercker", ->
       it "rerenders the images with a more recent timestamp as they are modified", ->
         [img2Path, img3Path] = []
         [img1Ver, img2Ver, img3Ver] = []
@@ -505,7 +537,34 @@ describe "MarkdownPreviewView", ->
 
       runs ->
         expect(atom.clipboard.read()).toBe """
-         <h1 id="code-block">Code Block</h1>
+         <h1>Code Block</h1>
          <pre class="editor-colors lang-javascript"><div class="line"><span class="source js"><span class="keyword control js"><span>if</span></span><span>&nbsp;a&nbsp;</span><span class="keyword operator js"><span>===</span></span><span>&nbsp;</span><span class="constant numeric js"><span>3</span></span><span>&nbsp;</span><span class="meta brace curly js"><span>{</span></span></span></div><div class="line"><span class="source js"><span>&nbsp;&nbsp;b&nbsp;</span><span class="keyword operator js"><span>=</span></span><span>&nbsp;</span><span class="constant numeric js"><span>5</span></span></span></div><div class="line"><span class="source js"><span class="meta brace curly js"><span>}</span></span></span></div></pre>
          <p>encoding \u2192 issue</p>
         """
+
+  describe "when maths rendering is enabled by default", ->
+    it "renders the preview without maths if it cannot find MathJax", ->
+      [workspaceElement] = []
+
+      preview.destroy()
+
+      waitsForPromise -> atom.packages.activatePackage('notifications')
+
+      runs ->
+        workspaceElement = atom.views.getView(atom.workspace)
+        jasmine.attachToDOM(workspaceElement)
+
+      waitsForPromise -> atom.workspace.open(filePath)
+
+      runs ->
+        atom.config.set 'markdown-preview-plus.enableLatexRenderingByDefault', true
+        atom.commands.dispatch workspaceElement, 'markdown-preview-plus:toggle'
+
+      expectPreviewInSplitPane()
+
+      waitsFor "notification", ->
+        workspaceElement.querySelector 'atom-notification'
+
+      runs ->
+        notification = workspaceElement.querySelector 'atom-notification.info'
+        expect(notification).toExist()

@@ -15,7 +15,6 @@ import {
 import {
   enable as enableHoverEvents,
   disable as disableHoverEvents,
-  isEnabled as hoverEventsEnabled,
 } from './hover-events.js';
 
 import {
@@ -29,15 +28,14 @@ import {
 } from './touch-events.js';
 
 import {
-  toggleConfig,
   observeConfig,
   onDidChangeConfig,
 } from './config.js';
 
 import {
   getTreeView,
+  getTreeViewEl,
   storeFocusedElement,
-  clearFocusedElement,
 } from './utils.js';
 
 export default function initCommands() {
@@ -76,14 +74,6 @@ export default function initCommands() {
 
     // add command listeners
     atom.commands.add('atom-workspace', {
-      // own commands
-      ['autohide-tree-view:toggle-push-editor']() {
-        toggleConfig('pushEditor');
-      },
-      // atom core commands
-      ['tool-panel:unfocus']() {
-        hideTreeView();
-      },
       // tree-view commands
       ['tree-view:show'](event) {
         event.stopImmediatePropagation();
@@ -102,8 +92,7 @@ export default function initCommands() {
       // patch reveal-active-file because it doesn't work
       // when the tree view isn't visible
       ['tree-view:reveal-active-file']() {
-        showTreeView(0, false).then(() =>
-          console.log(hoverEventsEnabled()) ||
+        showTreeView(0).then(() =>
           getTreeView().scrollToEntry(getTreeView().getSelectedEntries()[0])
         );
       },
@@ -134,13 +123,9 @@ export default function initCommands() {
       },
     }),
 
-    // clear the focused element when a modal panel is created
-    // because modal panels close when they lose focus
-    atom.commands.add('atom-workspace', 'command-palette:toggle', () =>
-      clearFocusedElement()
-    ),
-    atom.workspace.panelContainers.modal.onDidAddPanel(() =>
-      clearFocusedElement()
+    // hide the tree view when `esc` key is pressed
+    atom.commands.add(getTreeViewEl(), 'tool-panel:unfocus', () =>
+      hideTreeView()
     ),
   );
 
@@ -158,7 +143,6 @@ export default function initCommands() {
 
 function didOpenFile() {
   process.nextTick(() => {
-    clearFocusedElement();
     storeFocusedElement(atom.views.getView(atom.workspace.getActiveTextEditor()));
     hideTreeView();
   });

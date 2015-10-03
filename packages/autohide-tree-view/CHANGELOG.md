@@ -1,5 +1,29 @@
 # autohide-tree-view changelog
 
+## 0.24.5
+* Fix `maxWindowWidth` setting
+* Fix `autohide-tree-view:pin`, `autohide-tree-view:unpin` and `autohide-tree-view:toggle-pinned` commands
+
+## 0.24.4
+* Fix some focusing issues (#43, #28)
+* Set z-index of the tree view very high to fix tabs rendering above the tree view in some UI themes (#51)
+* Show a warning when enabling touch events without having the atom-touch-events package installed
+* Change default for the `showOn` setting from `hover + touch` to `touch` to prevent error messages from showing when you don't have the atom-touch-events package installed
+* Fix a crash when pinning the tree view when touch events are enabled
+* Fix the `autohide-tree-view:toggle-push-editor` command
+* Upgrade atom-touch-events' service to 0.21.0
+
+## 0.24.3
+* Fix crash when atom-touch-events isn't installed (#47)
+
+## 0.24.2
+* Better visual differentiation between pinned/unpinned state (#41)
+* Fix crash
+
+## 0.24.1
+* Listen only to primary mouse button events (#28)
+* Fix crash when atom-touch-events package isn't active (#32, #36, #44, #47)
+
 ## 0.24.0
 * Update service API:
   * Rename `enable`, `disable` and `isEnabled` to `pin`, `unpin` and `isPinned`, respectively

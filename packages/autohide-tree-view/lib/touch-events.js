@@ -1,7 +1,7 @@
 'use babel';
-import 'array.from';
-
-import SubAtom from 'sub-atom';
+import {
+  CompositeDisposable,
+} from 'atom';
 
 import {
   isEnabled as autohideEnabled,
@@ -19,29 +19,27 @@ import {
   isChildOf,
 } from './utils.js';
 
-var onDidTouchSwipeLeft;
-var onDidTouchSwipeRight;
+var touchEvents;
 
-export function consumeTouchSwipeLeftService(onDidTouchSwipeLeftService) {
-  onDidTouchSwipeLeft = onDidTouchSwipeLeftService;
-}
-
-export function consumeTouchSwipeRightService(onDidTouchSwipeRightService) {
-  onDidTouchSwipeRight = onDidTouchSwipeRightService;
+export function consumeTouchEvents(touchEventsService) {
+  touchEvents = touchEventsService;
+  if(getConfig('showOn').match('touch')) enable();
 }
 
 var enabled = false;
 var disposables;
 
 export function enable() {
+  if(!touchEvents)
+    return atom.notifications.addWarning('autohide-tree-view: atom-touch-events is not loaded, but it is required for touch events to work');
+
   if(enabled) return;
   enabled = true;
 
-  disposables = new SubAtom();
-
-  disposables.add(onDidTouchSwipeLeft(swipeChange, swipeEndLeft));
-
-  disposables.add(onDidTouchSwipeRight(swipeChange, swipeEndRight));
+  disposables = new CompositeDisposable(
+    touchEvents.onDidTouchSwipeLeft(swipeChange, () => swipeEnd(false)),
+    touchEvents.onDidTouchSwipeRight(swipeChange, () => swipeEnd(true)),
+  );
 }
 
 export function disable() {
@@ -59,18 +57,22 @@ export function isEnabled() {
 var currentSwipeEvent = null;
 
 function shouldInitSwipe(event, source) {
-  // false if autohide or touch events is disabled
+  // no swipe if either autohide or touch events is disabled
   if(!autohideEnabled() || !getConfig('showOn').match('touch')) return false;
+
   var { pageX } = event.touches[0];
-  // always swipe when target is tree view
+
+  // if swipe target isn't the tree view, check if
+  // swipe is in touchArea
   if(!isChildOf(source, getTreeViewEl().parentNode)) {
-    // check if in touch area
+    // no swipe if not in touch area
     if(getConfig('showOnRightSide', 'tree-view')) {
       if(pageX < window.innerWidth - getConfig('touchAreaSize')) return false;
     } else {
       if(pageX > getConfig('touchAreaSize')) return false;
     }
   }
+
   currentSwipeEvent = event;
   return true;
 }
@@ -89,16 +91,11 @@ function swipeChange({ args: event, source, deltaX }) {
   });
 }
 
-// triggered after swipe left
-function swipeEndLeft() {
+// triggered after swipe, completely opens/closes the tree view
+// depending on the side of the tree view and swipe direction
+function swipeEnd(toRight) {
   if(!currentSwipeEvent) return;
   currentSwipeEvent = null;
-  getConfig('showOnRightSide', 'tree-view') ? showTreeView() : hideTreeView();
-}
-
-// triggered after swipe right
-function swipeEndRight() {
-  if(!currentSwipeEvent) return;
-  currentSwipeEvent = null;
-  getConfig('showOnRightSide', 'tree-view') ? hideTreeView() : showTreeView();
+  // showOnRightSide XOR toRight
+  !getConfig('showOnRightSide', 'tree-view') + !toRight == 1 ? showTreeView() : hideTreeView();
 }

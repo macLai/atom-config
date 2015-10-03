@@ -34,6 +34,7 @@ import {
   storeFocusedElement,
   clearFocusedElement,
   restoreFocus,
+  focusTreeView,
 } from './utils.js';
 
 var enabled = false;
@@ -42,19 +43,13 @@ export function enable() {
   if(enabled) return Promise.resolve();
   enabled = true;
 
-  // check if the tree view package is loaded and
-  // wait until the tree view package is activated
-  return Promise.resolve(
-    atom.packages.isPackageLoaded('tree-view') &&
-    atom.packages.activatePackage('tree-view')
-  ).then(treeViewPkg => {
-    if(!treeViewPkg) return;
-    initTreeView(treeViewPkg);
-    handleEvents();
-    // start with pushEditor = true, we'll change it back
-    // with the next update()
-    return update(true);
-  }).then(() => update()).catch(logError);
+  getTreeViewEl().setAttribute('data-autohide', '');
+
+  handleEvents();
+  pinView.deactivate();
+
+  // start with pushEditor = true for a nicer animation
+  return update(true).then(() => update()).catch(logError);
 }
 
 export function disable() {
@@ -67,24 +62,36 @@ export function disable() {
   disableHoverEvents();
   disableClickEvents();
   disableTouchEvents();
+
+  pinView.activate();
+
+  var treeViewEl = getTreeViewEl();
   // the stylesheet will be removed before the animation is finished
   // which will reset the minWidth to 100px... it looks ugly, so set
   // minWidth on the element to prevent this
-  getTreeViewEl().style.minWidth = '0px';
-  // update with pushEditor = !isVisible() for a nicer animation
-  // then show the tree view
+  treeViewEl.style.minWidth = '0px';
+  // when the tree view is already visible, we don't want to animate
+  // with pushEditor == true, because it messes up the animation of
+  // the panel element when pushEditor == false in the settings
   return update(!isVisible()).then(() => show()).then(() => {
     // animate the tree view's panel if the tree view is already
-    // visible. this isn't necessary when pushEditor === true
-    // because then the parent has the same width as the tree view
-    if(isVisible() && !getConfig('pushEditor')) {
-      var treeViewEl = getTreeViewEl();
+    // visible
+    if(isVisible())
       return animate(treeViewEl.clientWidth, 0, treeViewEl.parentNode);
-    }
-  }).then(() =>
-    // finally dispose of the tree view and reset variables
-    deinitTreeView()
-  ).catch(logError);
+  }).then(() => {
+    // reset styles and attributes on the tree view
+    treeViewEl.removeAttribute('data-autohide');
+    Object.assign(treeViewEl.style, {
+      position: '',
+      height: '',
+      minWidth: '',
+    });
+
+    var panelView = atom.views.getView(getTreeView().panel);
+    if(panelView) panelView.style.width = '';
+
+    visible = false;
+  }).catch(logError);
 }
 
 export function isEnabled() {
@@ -95,52 +102,51 @@ export function toggleEnabled() {
   return enabled ? disable() : enable();
 }
 
-// keep references to the tree view model and element
-function initTreeView() {
-  getTreeViewEl().setAttribute('data-autohide', '');
-  getTreeViewEl().appendChild(pinView);
-}
-
-// remove the styles etc. on the tree view
-function deinitTreeView() {
-  getTreeViewEl().removeAttribute('data-autohide');
-  Object.assign(getTreeViewEl().style, {
-    position: '',
-    height: '',
-    minWidth: '',
-  });
-
-  var panelView = atom.views.getView(getTreeView().panel);
-  if(panelView) panelView.style.width = '';
-
-  visible = false;
-}
-
 var disposables;
 
 function handleEvents() {
+  var treeViewEl = getTreeViewEl();
+
   disposables = new SubAtom();
 
   disposables.add(initCommands());
 
   // resize the tree view when opening/closing a directory
-  disposables.add(getTreeViewEl(), 'click', '.entry.directory', () =>
-    resize()
-  );
+  disposables.add(treeViewEl, 'click', '.entry.directory', event => {
+    if(event.button == 0) resize();
+  });
 
-  disposables.add(getTreeViewEl(), 'click', '.entry.file', () => {
-    var disposable = atom.workspace.onDidChangeActivePaneItem(paneItem => {
-      console.log(paneItem);
-      clearFocusedElement();
+  disposables.add(treeViewEl, 'click', '.entry.file', event => {
+    if(event.button == 0) var disposable = atom.workspace.onDidChangeActivePaneItem(paneItem => {
       storeFocusedElement(atom.views.getView(paneItem));
       disposable.dispose();
     });
   });
 
+  disposables.add(getTreeView().list[0], 'blur', () =>
+    clearFocusedElement()
+  );
+
   // disable shrinking of the tree view after a manual resize
-  disposables.add(getTreeViewEl().querySelector('.tree-view-resize-handle'), 'mousedown', () => {
-    if(isVisible()) disableTreeViewShrinking();
+  disposables.add(treeViewEl.querySelector('.tree-view-resize-handle'), 'mousedown', event => {
+    if(isVisible() && event.button == 0) disableShrinking();
   });
+
+  // hide the tree view when a text editor is focused
+  disposables.add(atom.workspace.observeTextEditors(textEditor => {
+    var textEditorDisposable = new SubAtom();
+
+    textEditorDisposable.add(atom.views.getView(textEditor), 'focus', () => {
+      if(isVisible()) hide();
+    });
+
+    textEditorDisposable.add(textEditor.onDidDestroy(() => {
+      textEditorDisposable.dispose();
+      disposables.remove(textEditorDisposable);
+    }));
+
+    disposables.add(textEditorDisposable);
+  }));
 }
 
 // updates styling on the .tree-view-resizer and the panel (container)
@@ -161,15 +167,16 @@ function updateTreeView(pushEditor) {
 
 function updatePanel(pushEditor) {
   var panelView = atom.views.getView(getTreeView().panel);
-  if(!panelView) return; // tree view not attached
+  if(!panelView) return;
+
   panelView.style.width = pushEditor ? '' : `${getConfig('minWidth')}px`;
+
   // make sure the tree view is at the far end of the screen
-  var parentNode = panelView.parentNode;
-  if(getConfig('showOnRightSide', 'tree-view')) {
-    parentNode.appendChild(panelView);
-  } else {
-    parentNode.insertBefore(panelView, parentNode.firstChild);
-  }
+  var panelContainer = panelView.parentNode;
+  if(getConfig('showOnRightSide', 'tree-view'))
+    panelContainer.appendChild(panelView);
+  else
+    panelContainer.insertBefore(panelView, panelContainer.firstChild);
 }
 
 var visible = false;
@@ -179,37 +186,37 @@ export function show(delay = 0, shouldDisableHoverEvents = true) {
   visible = true;
   // disable hover events on the tree view when this
   // show is not triggered by a hover event
-  if(shouldDisableHoverEvents && hoverEventsEnabled()) {
+  if(shouldDisableHoverEvents && hoverEventsEnabled())
     disposables.add(disableHoverEventsUntilBlur());
-  }
+
   // keep a reference to the currently focused element
   // so we can restore focus when the tree view will hide
   storeFocusedElement();
-  var treeViewWidth = getContentWidth();
-  // don't resize the tree view if its width is
-  // larger than the target width and shrinking
-  // is disabled
-  if(!treeViewShrinking) {
-    treeViewWidth = Math.max(treeViewWidth, getTreeViewEl().clientWidth);
-  }
-  return animate(treeViewWidth, delay).then(finished => {
+
+  // don't resize the tree view if its width is larger
+  // than the target width and shrinking is disabled
+  var treeViewWidth = Math.max(getContentWidth(), canTreeViewShrink * getTreeViewEl().clientWidth);
+
+  return animate(treeViewWidth, delay).then(hasFinished => {
     // make sure the hover area doesn't block tree items
     hoverArea.style.pointerEvents = 'none';
     // focus the tree view if the animation finished
-    if(finished) getTreeView().focus();
-    return finished;
+    if(hasFinished) focusTreeView();
+    return hasFinished;
   });
 }
 
 // hides the tree view
 export function hide(delay = 0) {
   visible = false;
-  // enable tree view shrinking upon opening a directory
-  enableTreeViewShrinking();
+  // enable tree view shrinking
+  enableShrinking();
   hoverArea.style.pointerEvents = '';
-  // focus the element that had focus when show() was triggered
-  restoreFocus();
-  return animate(getConfig('minWidth'), delay);
+  return animate(getConfig('minWidth'), delay).then(hasFinished => {
+    // focus the element that had focus when show() was triggered
+    if(hasFinished) restoreFocus();
+    return hasFinished;
+  });
 }
 
 export function isVisible() {
@@ -228,14 +235,16 @@ export function resize() {
   );
 }
 
-var treeViewShrinking = true;
+// temporarily disables shrinking
+// width of the tree view
+var canTreeViewShrink = true;
 
-function disableTreeViewShrinking() {
-  treeViewShrinking = false;
+function disableShrinking() {
+  canTreeViewShrink = false;
 }
 
-function enableTreeViewShrinking() {
-  treeViewShrinking = true;
+function enableShrinking() {
+  canTreeViewShrink = true;
 }
 
 var currentAnimation = null;
@@ -243,7 +252,6 @@ var currentAnimation = null;
 // the animation function resolves with 'true' if the
 // animation finished, with 'false' if cancelled
 function animate(targetWidth, delay, element = getTreeViewEl()) {
-  // get the initial width of the element
   var initialWidth = element.clientWidth;
   // set animationSpeed to Infinity if it equals 0
   var animationSpeed = getConfig('animationSpeed') || Infinity;
@@ -251,10 +259,11 @@ function animate(targetWidth, delay, element = getTreeViewEl()) {
   // equals 0 divide by Infinity for a duration of 0
   var duration = Math.abs(targetWidth - initialWidth) / animationSpeed;
 
-  // cancel any current animation
-  if(currentAnimation && currentAnimation.playState !== 'finished') {
+  // cancel any current animation and
+  // immediately trigger this animation
+  if(currentAnimation && currentAnimation.playState != 'finished') {
     currentAnimation.cancel();
-    delay = 0; // immediately trigger the next animation
+    delay = 0;
   }
 
   return new Promise(resolve => {
@@ -268,10 +277,11 @@ function animate(targetWidth, delay, element = getTreeViewEl()) {
     animation.addEventListener('finish', function finish() {
       animation.removeEventListener('finish', finish);
       // if cancelled, resolve with false
-      if(animation.playState != 'finished') return void resolve(false);
+      if(animation.playState != 'finished')
+        return void resolve(false);
+
       // prevent tree view from resetting its width to initialWidth
       element.style.width = `${targetWidth}px`;
-      // reset the currentAnimation reference
       currentAnimation = null;
       resolve(true);
     });

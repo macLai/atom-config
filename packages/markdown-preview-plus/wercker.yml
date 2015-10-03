@@ -5,7 +5,9 @@ build:
   steps:
     - script:
         name: Install dependencies
-        code: apm install
+        code: >
+          apm install &&
+          apm install mathjax-wrapper
     - script:
         name: Test package
         code: >
@@ -14,4 +16,5 @@ build:
           +extension GLX +extension RANDR +render -noreset &&
           sleep 3 &&
           export DISPLAY=:99 &&
+          atom --version &&
           apm test

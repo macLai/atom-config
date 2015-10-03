@@ -13,6 +13,9 @@
     ignoredNames: [
       ".*"
     ]
+    disabledPackages: [
+      "vim-mode"
+    ]
   "markdown-preview":
     useGitHubStyle: true
     breakOnSingleNewline: true
@@ -20,7 +23,6 @@
     invisibles: {}
   "atom-material-ui":
     compactTreeView: true
-    showTabIcons: true
     slimScrollbar: true
     tabSize: "Small"
     rippleAccentColor: true

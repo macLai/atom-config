@@ -16,7 +16,7 @@ class Commands
     @index = null
 
   togglePanel: ->
-    @linter.views.panel.panelVisibility = not @linter.views.panel.panelVisibility
+    atom.config.set('linter.showErrorPanel', !atom.config.get('linter.showErrorPanel'))
 
   toggleLinter: ->
     activeEditor = atom.workspace.getActiveTextEditor()
@@ -26,6 +26,7 @@ class Commands
       editorLinter.destroy()
     else
       @linter.createEditorLinter(activeEditor)
+      @lint()
 
 
   setBubbleTransparent: ->
@@ -89,7 +90,7 @@ class Commands
     atom.workspace.open(message.filePath).then ->
       atom.workspace.getActiveTextEditor().setCursorBufferPosition(message.range.start)
 
-  destroy: ->
+  dispose: ->
     @messages = null
     @subscriptions.dispose()
 

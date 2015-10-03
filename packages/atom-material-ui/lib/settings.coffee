@@ -12,12 +12,6 @@ module.exports =
             type: 'string'
             default: 'Normal'
             enum: ['Small', 'Normal', 'Big']
-        themeSyle:
-            title: 'Theme style'
-            description: 'Select the theme style from Default, Darker and Lighter'
-            type: 'string'
-            default: 'Default'
-            enum: ['Darker', 'Default', 'Lighter']
         useRoboto:
             title: 'Use Roboto Mono font in text editors'
             type: 'boolean',
@@ -66,6 +60,10 @@ module.exports =
         rippleAccentColor:
             title: 'Use accent color in tabs\' ripple effect'
             type: 'boolean',
+            default: false
+        useRobotoInUI:
+            title: 'Use Roboto font for UI'
+            type: 'boolean'
             default: false
 
     activate: (state) ->

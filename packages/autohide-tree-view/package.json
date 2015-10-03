@@ -1,7 +1,7 @@
 {
   "name": "autohide-tree-view",
   "main": "./lib/main.js",
-  "version": "0.24.0",
+  "version": "0.24.5",
   "description": "Hides the tree view, reveal it on hover, click or swipe.",
   "keywords": [
     "autohide",
@@ -10,7 +10,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/olmokramer/atom-autohide-tree-view"
+    "url": "git+https://github.com/olmokramer/atom-autohide-tree-view.git"
   },
   "license": "MIT",
   "engines": {
@@ -19,7 +19,7 @@
   "dependencies": {
     "array.from": "^0.2.0",
     "object-assign-shim": "^1.0.0",
-    "sub-atom": "^1.0.0"
+    "sub-atom": "^1.1.0"
   },
   "providedServices": {
     "autohide-tree-view": {
@@ -32,27 +32,22 @@
     }
   },
   "consumedServices": {
-    "touch-swipe-left-service": {
+    "touch-events": {
       "versions": {
-        "^0.12.0": "consumeTouchSwipeLeftService"
-      }
-    },
-    "touch-swipe-right-service": {
-      "versions": {
-        "^0.12.0": "consumeTouchSwipeRightService"
+        "0.21.0": "consumeTouchEvents"
       }
     }
   },
-  "readme": "# autohide-tree-view package\n\nHide the tree view, show it on hover.\n\n![Image inserted by Atom editor package auto-host-markdown-image](https://raw.githubusercontent.com/olmokramer/atom-autohide-tree-view/master/screencast.gif)\n\n## Config\n\n| setting          | type    | unit    | default       | description |\n| ---              | ---     | ---     | ---           | --- |\n| `showOn`         | string  | none    | hover + touch | The type of event that should trigger show/hide of the tree view. `Hover`, `Click`, `Touch` (or any combination) or `None`. |\n| `animate`        | boolean | none    | true          | Enable/disable the animation when showing the menu |\n| `showDelay`      | number  | seconds | 0.2           | The delay before the tree view will show when hovered |\n| `hideDelay`      | number  | seconds | 0.2           | The delay before the tree view will hide when hovered |\n| `minwidth`       | integer | pixels  | 1             | The width of the hidden tree view |\n| `pushEditor`     | boolean | none    | false         | Push the editor when showing the tree view |\n| `hoverAreasize`  | integer | pixels  | 0             | Width of an invisible area at the edge of the screen where hover events will be triggered. When smaller than the value of the minwidth setting, minwidth will be used. |\n| `touchAreaSize`  | integer | pixels  | 50            | Width of an invisible area at the edge of the screen where touch events will be triggered. |\n| `maxWindowWidth` | integer | pixels  | 0             | Max window width for which autohide should be enabled. If on a resize the window width crosses this threshold, autohide will automatically be enabled or disabled. Set to 0 to always have autohide enabled. |\n| `showPinButton`  | boolean | none    | false         | Show a pin button in the tree view that enables/disables autohide. |\n\n## Touch events\n\nShow/hide the tree view with swiping gestures. For touch events, the [atom-touch-events](https://atom.io/packages/atom-touch-events) package is required. You'll have to re-enable autohide-tree-view, or reload Atom, after installing atom-touch-events for the touch events to work.\n\n## Services provided\n\nautohide-tree-view provides a service for Show, Hide, Enable and Disable actions. To consume the service, put the following in your package's `package.json`:\n\n```json\n\"consumedServices\": {\n  \"autohide-tree-view\": {\n    \"versions\": {\n      // refers to the consumer method in your package's main module\n      \"^0.20.0\": \"consumeAutohideTreeViewService\"\n    }\n  }\n}\n```\n\nAnd in your package's main module, put this:\n\n```coffee\nconsumeAutohideTreeViewService: (service) ->\n  # show/hide the tree view\n  # @param delay: delay in ms before starting the animation\n  service.show(delay)\n  service.hide(delay)\n  service.isVisible()\n\n  # enable/disable autohide behaviour\n  service.pin()\n  service.unpin()\n  service.isPinned()\n```\n\nThe `show`, `hide`, `pin` and `unpin` methods return a promise that will be resolved once the tree view animation is done. It's resolved value is a boolean, indicating if the animation was finished (`true`) or cancelled (`false`). The promise is rejected if an error occurs during the animation.\n\n`isVisible` and `isPinned` return a boolean, indicating whether the tree view is visible or pinned.\n\nA silly example:\n\n```js\n// open the tree view, and hide it again if\n// it wasn't cancelled\nfunction consumeAutohideTreeViewService(service) {\n  service.show(0).then(function(finished) {\n    if(finished) {\n      service.hide();\n    }\n  }, function(err) {\n    // something went wrong!!\n    console.error(err);\n  });\n}\n```\n\n## Issues/suggestions\n\nPlease file issues or suggestions on the [issues page on github](https://github.com/olmokramer/atom-autohide-tree-view/issues/new), or even better, [submit a pull request](https://github.com/olmokramer/atom-autohide-tree-view/pulls)\n\n## License\n\n&copy; 2015 Olmo Kramer <br> [MIT License](LICENSE.md)\n",
+  "readme": "# autohide-tree-view package\n\nHide the tree view, show it on hover.\n\n![](https://raw.githubusercontent.com/olmokramer/atom-autohide-tree-view/master/screencast.gif)\n\n## Config\n\n| setting | type | unit | default | description |\n| --- | --- | --- | --- | --- |\n| `showOn` | string | none | hover | The type of event that should trigger show/hide of the tree view. `Hover`, `Click`, `Touch` (or any combination) or `None`. |\n| `animate` | boolean | none | true | Enable/disable the animation when showing the menu |\n| `showDelay` | number | seconds | 0.2 | The delay before the tree view will show when hovered |\n| `hideDelay` | number | seconds | 0.2 | The delay before the tree view will hide when hovered |\n| `minwidth` | integer | pixels | 1 | The width of the hidden tree view |\n| `pushEditor` | boolean | none | false | Push the editor when showing the tree view |\n| `hoverAreasize` | integer | pixels | 0 | Width of an invisible area at the edge of the screen where hover events will be triggered. When smaller than the value of the minwidth setting, minwidth will be used. |\n| `touchAreaSize` | integer | pixels | 50 | Width of an invisible area at the edge of the screen where touch events will be triggered. |\n| `maxWindowWidth` | integer | pixels | 0 | Max window width for which autohide should be enabled. If on a resize the window width crosses this threshold, autohide will automatically be enabled or disabled. Set to 0 to always have autohide enabled. |\n| `showPinButton` | boolean | none | true | Show a pin button in the tree view that enables/disables autohide. |\n| `autoFocusTreeViewOnHover` | boolean | none | true | Focus and unfocus the tree view on hover events. This setting exists because some people were experiencing issues with the tree view's add/rename dialogs where the dialogs would close almost immediately after opening. See #28 for more details. |\n\n## Touch events\n\nShow/hide the tree view with swiping gestures. For touch events, the [atom-touch-events](https://atom.io/packages/atom-touch-events) package is required. You'll have to re-enable autohide-tree-view, or reload Atom, after installing atom-touch-events for the touch events to work.\n\n## Services provided\n\nautohide-tree-view provides a service for Show, Hide, Enable and Disable actions. To consume the service, put the following in your package's `package.json`:\n\n```json\n\"consumedServices\": {\n  \"autohide-tree-view\": {\n    \"versions\": {\n      // refers to the consumer method in your package's main module\n      \"^0.24.0\": \"consumeAutohideTreeViewService\"\n    }\n  }\n}\n```\n\nAnd in your package's main module, put this:\n\n```coffee\nconsumeAutohideTreeViewService: (service) ->\n  # show/hide the tree view\n  # @param delay: delay in ms before starting the animation\n  service.show(delay)\n  service.hide(delay)\n  service.isVisible()\n\n  # enable/disable autohide behaviour\n  service.pin()\n  service.unpin()\n  service.isPinned()\n```\n\nThe `show`, `hide`, `pin` and `unpin` methods return a promise that will be resolved once the tree view animation is done. It's resolved value is a boolean, indicating if the animation was finished (`true`) or cancelled (`false`). The promise is rejected if an error occurs during the animation.\n\n`isVisible` and `isPinned` return a boolean, indicating whether the tree view is visible or pinned.\n\nA silly example:\n\n```js\n// open the tree view, and hide it again if\n// it wasn't cancelled\nfunction consumeAutohideTreeViewService(service) {\n  service.show(0).then(function(finished) {\n    if(finished) {\n      service.hide();\n    }\n  }, function(err) {\n    // something went wrong!!\n    console.error(err);\n  });\n}\n```\n\n## Issues/suggestions\n\nPlease file issues or suggestions on the [issues page on github](https://github.com/olmokramer/atom-autohide-tree-view/issues/new), or even better, [submit a pull request](https://github.com/olmokramer/atom-autohide-tree-view/pulls)\n\n## License\n\n&copy; 2015 Olmo Kramer <br> [MIT License](LICENSE.md)\n",
   "readmeFilename": "README.md",
   "bugs": {
     "url": "https://github.com/olmokramer/atom-autohide-tree-view/issues"
   },
-  "homepage": "https://github.com/olmokramer/atom-autohide-tree-view",
-  "_id": "autohide-tree-view@0.24.0",
-  "_shasum": "98a61e5dd3174ae89c704d267b039238e9bdd862",
-  "_resolved": "file:../d-11579-84148-jn5gmn/package.tgz",
-  "_from": "../d-11579-84148-jn5gmn/package.tgz",
+  "homepage": "https://github.com/olmokramer/atom-autohide-tree-view#readme",
+  "_id": "autohide-tree-view@0.24.5",
+  "_shasum": "d138c51edf735cde45d088dee00ddc75b52acf8d",
+  "_resolved": "file:../d-115827-19685-ajy97m/package.tgz",
+  "_from": "../d-115827-19685-ajy97m/package.tgz",
   "_atomModuleCache": {
     "version": 1,
     "dependencies": [
@@ -194,7 +189,7 @@
         "dependencies": {
           "array.from": "^0.2.0",
           "object-assign-shim": "^1.0.0",
-          "sub-atom": "^1.0.0"
+          "sub-atom": "^1.1.0"
         }
       },
       {
